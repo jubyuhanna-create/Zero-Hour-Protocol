@@ -217,6 +217,7 @@ footer{padding:10px 18px 22px;font-size:12px;color:var(--tx2)}
     <div>Mission time<b id="met"></b></div>
     <div>Signal delay to Earth<b id="delay"></b></div>
     <div>Cabin air<b id="cabin"></b></div>
+    <div>Ship database<b id="be">Checking</b></div>
   </div>
   <div class="ctrls">
     <button id="bDemo">Play demo</button>
@@ -503,6 +504,7 @@ function step(a,silent){
   mv('hr',.18,1.1);mv('spo2',.12,.22);mv('temp',.06,.02);mv('rr',.15,.45);mv('sbp',.12,1.1);mv('dbp',.12,.7);mv('hrv',.12,1.4);
   if(ar>.25)v.hr=t.hr+(Math.random()-.5)*64*ar;
   v.spo2=clamp(v.spo2,70,100);v.hrv=clamp(v.hrv,5,130);v.hr=clamp(v.hr,25,220);
+  if(a.live&&Date.now()-a.live.at<30000)['hr','spo2','temp','rr','sbp','dbp'].forEach(k=>{if(a.live[k]!=null)v[k]=a.live[k]});
 
   // context-aware stress index: only counts deviation BEYOND what the activity explains
   const st=clamp(12+.55*Math.max(0,v.hr-exp.hr)+.9*Math.max(0,exp.hrv-v.hrv)+(sp>.05?12:0)+(a.act==='eva'?8:0),0,100);
@@ -657,7 +659,7 @@ function render(){
     c.setAttribute('aria-current',i===sel);c.classList.toggle('a3',L===3);
     const st=q('st');st.textContent=LVL[L];st.className='st st'+L;
     q('hr').textContent=v.hr.toFixed(0);q('sp').textContent=v.spo2.toFixed(0);
-    q('act').textContent=ACT_TXT[a.act]+(world.shelter?', in shelter':'');
+    q('act').textContent=ACT_TXT[a.act]+(world.shelter?', in shelter':'')+(a.live&&Date.now()-a.live.at<30000?', live sensor':'');
     q('dose').textContent=v.dose.toFixed(1)+' mSv';
     trend(q('spark'),a.hist.hr,{min:30,max:180,color:'#4ce07b',lw:1.2});
   });
@@ -750,7 +752,10 @@ function waveLoop(ts){
 }
 
 /* ---------------- EVENTS ---------------- */
-function log(i,l,m){LOG.push({t:clock(met),l,m});if(LOG.length>500)LOG.shift()}
+function log(i,l,m,sync=true){
+  const e={t:clock(met),l,m};LOG.push(e);if(LOG.length>500)LOG.shift();
+  if(sync&&API.db&&!demoOn&&(l==='i'||l>=2))apiPost('/api/events',{crew_id:crew[i]?.id||null,level:String(l),met:Math.round(met),message:m}).then(r=>{if(r&&r.id){e.id=r.id;API.seen.add(r.id)}});
+}
 function beep(){
   if(!audioOn||!actx)return;
   [0,.18,.36].forEach(d=>{const o=actx.createOscillator(),g=actx.createGain();o.type='sine';o.frequency.value=d===.18?988:880;
@@ -799,7 +804,10 @@ $('#bCsv').onclick=()=>{
   const blob=new Blob([head+CSV.map(r=>r.join(',')).join('\n')],{type:'text/csv'});
   const u=URL.createObjectURL(blob),l=document.createElement('a');l.href=u;l.download='zero_hour_telemetry.csv';l.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
 };
-$('#bDown').onclick=()=>{$('#report').textContent=report();$('#modal').classList.add('show');$('#bClose').focus()};
+$('#bDown').onclick=async()=>{
+  let txt=report();
+  if(API.db){try{const r=await fetch('/api/report');if(r.ok)txt+='\n\n----------------\n'+await r.text()}catch(_){}}
+  $('#report').textContent=txt;$('#modal').classList.add('show');$('#bClose').focus()};
 $('#bClose').onclick=()=>$('#modal').classList.remove('show');
 $('#bCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('#report').textContent);$('#bCopy').textContent='Copied'}catch(_){$('#bCopy').textContent='Select and copy manually'}};
 document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key>='1'&&e.key<='4'){sel=+e.key-1;render()}if(e.key==='Escape')$('#modal').classList.remove('show')});
@@ -854,6 +862,7 @@ function openCi(){
 function saveCi(feel,sleep,syms,idx=sel,glu=null){
   const a=crew[idx];a.ci={feel,sleep,sym:new Set(syms),t:met};a.rt.add('ci');if(glu!=null){a.glu=glu;a.rt.add('glu')}
   a.lt.sleep[TODAY]=sleep;a.lt.mood[TODAY]=feel;a.done.clear();
+  if(API.db&&!demoOn)apiPost('/api/checkin',{crew_id:a.id,source:'form',feel,sleep,glucose:glu,symptoms:syms});
   log(idx,syms.length||feel<=2||sleep<5?1:'i',`${a.name} checked in: feeling ${feel} of 5, slept ${sleep} h${syms.length?', '+syms.map(k=>SYM[k]).join(', '):''}`);
   triage(a);render();
 }
@@ -1059,7 +1068,7 @@ function applyVoice(res,idx=sel){
 }
 async function sendText(t,idx=sel){
   if(!t.trim())return;
-  let res;try{res=await askApi({text:t});res.via='gemini'}catch(_){res=localParse(t)}
+  let res;try{res=await askApi({text:t,crew_id:crew[idx].id});res.via='gemini'}catch(_){res=localParse(t);if(API.db)apiPost('/api/checkin',{crew_id:crew[idx].id,source:'voice',symptoms:res.symptoms,pain_score:res.pain_score>=0?res.pain_score:null,transcript:t})}
   if(!res.transcript)res.transcript=t;
   applyVoice(res,idx);
 }
@@ -1096,7 +1105,7 @@ async function micStop(){
   $('#bMic').setAttribute('aria-pressed','false');$('#bMic').textContent='Hold to talk';
   if(Date.now()-r.t0<600)return;
   $('#bMic').textContent='Thinking…';
-  try{const res=await askApi({audio:toWav(r.chunks,r.rate),mime:'audio/wav'});res.via='gemini';applyVoice(res)}
+  try{const res=await askApi({audio:toWav(r.chunks,r.rate),mime:'audio/wav',crew_id:crew[sel].id});res.via='gemini';applyVoice(res)}
   catch(_){$('#vChat').insertAdjacentHTML('afterbegin','<div class="sys">Could not reach the speech service. Type how you feel instead.</div>')}
   $('#bMic').textContent='Hold to talk';
 }
@@ -1105,6 +1114,37 @@ mic.addEventListener('pointerdown',e=>{e.preventDefault();micStart()});
 ['pointerup','pointerleave'].forEach(ev=>mic.addEventListener(ev,()=>micStop()));
 mic.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();micStart()}});
 mic.addEventListener('keyup',e=>{if(e.key===' '||e.key==='Enter')micStop()});
+
+/* ---------------- BACKEND SYNC ----------------
+   When the app runs on the deployed server, check-ins, voice reports and events are
+   saved to the ship database and shared by every screen. Real sensors post to
+   /api/telemetry and override the simulated values for that crew member. */
+let demoOn=false;
+const API={db:false,voice:false,lastEvent:0,seen:new Set()};
+async function apiGet(p){try{const r=await fetch(p);return r.ok?r.json():null}catch(_){return null}}
+async function apiPost(p,b){try{const r=await fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.ok?r.json():null}catch(_){return null}}
+function addServerEvents(rows){
+  rows.forEach(e=>{API.lastEvent=Math.max(API.lastEvent,e.id);if(API.seen.has(e.id))return;API.seen.add(e.id);
+    LOG.push({id:e.id,t:e.met!=null?clock(e.met):new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),l:e.level==='i'?'i':+e.level,m:e.message})});
+}
+async function bootApi(){
+  const h=await apiGet('/api/health');
+  API.db=!!(h&&h.database);API.voice=!!(h&&h.voice);
+  $('#be').textContent=API.db?'Synced':h?'Not connected':'Offline, this device only';
+  $('#be').style.color=API.db?'var(--ok)':'var(--tx2)';
+  if(!API.db)return;
+  const ev=await apiGet('/api/events');if(ev)addServerEvents(ev.rows);
+  const ck=await apiGet('/api/checkin');
+  if(ck)Object.values(ck.latest).forEach(k=>{const i=crew.findIndex(c=>c.id===k.crew_id);if(i<0)return;const a=crew[i];
+    if(k.source==='form'&&k.feel!=null){a.ci={feel:k.feel,sleep:k.sleep??7,sym:new Set(k.symptoms||[]),t:met};a.rt.add('ci')}
+    if(k.source==='voice')a.voice={t:met,transcript:k.transcript||'',sym:new Set(k.symptoms||[]),pain:{score:k.pain_score??-1,loc:k.pain_location||''}};
+    if(k.glucose!=null){a.glu=k.glucose;a.rt.add('glu')}
+    triage(a)});
+  render();
+  setInterval(async()=>{const ev=await apiGet('/api/events?after='+API.lastEvent);if(ev&&ev.rows.length){addServerEvents(ev.rows);render()}},10000);
+  setInterval(async()=>{const t=await apiGet('/api/telemetry?latest=1');if(!t)return;
+    Object.values(t.latest).forEach(r=>{const a=crew.find(c=>c.id===r.crew_id);if(a)a.live={...r,at:Date.now()-(Date.parse(t.now)-Date.parse(r.ts))}})},5000);
+}
 
 /* ---------------- GUIDED DEMO ---------------- */
 const pick=i=>{sel=i;render()};
@@ -1128,9 +1168,9 @@ const DEMO=[
  [102,null,null]
 ];
 let demoT=[],demoStart=0,demoRaf=0;
-function stopDemo(){demoT.forEach(clearTimeout);demoT=[];cancelAnimationFrame(demoRaf);$('#cap').classList.remove('show')}
+function stopDemo(){demoOn=false;demoT.forEach(clearTimeout);demoT=[];cancelAnimationFrame(demoRaf);$('#cap').classList.remove('show')}
 function playDemo(){
-  stopDemo();demoStart=performance.now();$('#cap').classList.add('show');
+  stopDemo();demoOn=true;demoStart=performance.now();$('#cap').classList.add('show');
   const total=DEMO[DEMO.length-1][0];
   DEMO.forEach(([t,txt,fn])=>demoT.push(setTimeout(()=>{if(txt==null){stopDemo();return}fn&&fn();$('#capTxt').textContent=txt},t*1000)));
   const bar=()=>{$('#capBar').style.width=Math.min(100,(performance.now()-demoStart)/total/10)+'%';demoRaf=requestAnimationFrame(bar)};bar();
@@ -1140,7 +1180,7 @@ $('#bDemo').onclick=playDemo;$('#capStop').onclick=stopDemo;
 buildCrew();renderI4();
 for(let i=0;i<HIST;i++)tick(true);
 log(-1,'i','Monitor started. Personal baselines loaded for 4 crew members.');
-render();setTimer();requestAnimationFrame(waveLoop);
+render();setTimer();requestAnimationFrame(waveLoop);bootApi();
 </script>
 </body>
 </html>

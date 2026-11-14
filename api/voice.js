@@ -2,6 +2,9 @@
 // The API key stays on the server (Vercel env var GEMINI_API_KEY). It never reaches the browser.
 // The model only listens and extracts. All medical decisions are made by the triage rules in index.html.
 
+const db = require('./_lib/db');
+const { save } = require('./checkin');
+
 const KEYS = ['chest','breath','vision','dizzy','headache','nausea','back','flank','abdomen','limb','fatigue','anxious'];
 
 const PROMPT = `You are the speech front end of a health monitor used by astronauts on a long space mission.
@@ -31,7 +34,7 @@ module.exports = async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(500).json({ error: 'GEMINI_API_KEY is not set' });
 
-  const { audio, mime, text } = req.body || {};
+  const { audio, mime, text, crew_id } = req.body || {};
   const parts = [];
   if (audio) {
     if (audio.length > 3_000_000) return res.status(413).json({ error: 'Recording too long' });
@@ -57,6 +60,13 @@ module.exports = async (req, res) => {
     if (!r.ok) return res.status(502).json({ error: j.error?.message || 'Gemini error' });
     const out = JSON.parse(j.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
     out.symptoms = (out.symptoms || []).filter(k => KEYS.includes(k));
+    // Keep the report in the crew record so the flight surgeon sees it in the downlink.
+    if (crew_id && db.ready()) {
+      try {
+        const saved = await save({ crew_id, source: 'voice', symptoms: out.symptoms, pain_score: out.pain_score >= 0 ? out.pain_score : null, pain_location: out.pain_location, transcript: out.transcript });
+        out.saved_id = saved.id;
+      } catch (e) { console.error(e); }
+    }
     return res.status(200).json(out);
   } catch (e) {
     return res.status(502).json({ error: 'Could not reach Gemini' });

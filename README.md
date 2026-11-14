@@ -17,15 +17,67 @@ On the way to Mars an answer from Earth takes about 23 minutes. Zero Hour Protoc
 - **Training drills and a guided demo**: oxygen leak, arrhythmia, suit cooling failure, sleep loss, solar storm and storm shelter.
 - **Downlink report** for the flight surgeon and CSV export of all telemetry.
 
+## Architecture
+
+```
+ Sensors (ESP32 + MAX30102, wearables)          Crew tablets and laptops (index.html)
+        |  POST /api/telemetry + device key              |   check-ins, voice, events, polling
+        v                                                v
+ +--------------------------------- Vercel serverless API ---------------------------------+
+ |  telemetry.js  triage on every reading, alerts to the event log                         |
+ |  checkin.js    daily check-ins and voice reports                                        |
+ |  events.js     shared mission log, every screen sees the same history                   |
+ |  voice.js      speech to structured symptoms with Gemini, key stays on the server       |
+ |  report.js     downlink report for the flight surgeon, built from the database          |
+ |  health.js     which features are switched on                                           |
+ +--------------------------------------------+--------------------------------------------+
+                                              v
+                        Supabase Postgres, row level security on, server access only
+```
+
+The page also works with no backend at all, on the simulator only, so the demo never breaks.
+
+## API
+
+| Method | Path | What it does |
+|---|---|---|
+| GET | `/api/health` | Database, voice and sensor upload status |
+| POST | `/api/telemetry` | Sensor reading or batch of up to 50. Needs header `x-device-key`. Triaged and stored, warnings go to the event log |
+| GET | `/api/telemetry?latest=1` | Newest reading per crew member from the last minute |
+| GET | `/api/telemetry?crew=CDR&minutes=30` | History for one crew member |
+| POST | `/api/checkin` | Mood, sleep, glucose, symptoms, pain |
+| GET | `/api/checkin` and `?crew=FE&days=14` | Latest per crew, or history |
+| GET, POST | `/api/events` and `?after=ID` | Shared event log with polling |
+| POST | `/api/voice` | Audio or text in, structured symptoms out, saved as a voice report |
+| GET | `/api/report` | Plain text downlink report. `?format=json` for JSON |
+
+Send a reading by hand:
+
+```
+curl -X POST https://YOUR-APP.vercel.app/api/telemetry \
+  -H "Content-Type: application/json" -H "x-device-key: YOUR_DEVICE_KEY" \
+  -d '{"crew_id":"PLT","hr":72,"spo2":98,"activity":"rest"}'
+```
+
+## Real sensor
+
+`esp32/pulse_uplink/pulse_uplink.ino` reads heart rate from a MAX30102 on an ESP32 and posts it every 5 seconds. The dashboard then shows that crew member as a live sensor.
+
 ## Run it
 
-Open `index.html` in a browser. Everything works offline except the voice medic, which falls back to a local keyword parser.
+Open `index.html` in a browser for the offline version: simulator, triage and a keyword based voice medic all work without a server.
 
-## Deploy on Vercel with voice
+## Deploy
 
-1. Import this repository in Vercel. No build step is needed.
-2. In Project Settings, Environment Variables, add `GEMINI_API_KEY`. Optional: `GEMINI_MODEL` (default `gemini-2.5-flash`).
-3. Deploy. `api/voice.js` keeps the key on the server, so it never reaches the browser.
+1. Create a Supabase project. In SQL Editor run `supabase/schema.sql`.
+2. Import this repository in Vercel. No build step is needed.
+3. In Vercel, Settings, Environment Variables, add:
+   - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from Supabase, Project Settings, API
+   - `GEMINI_API_KEY` for the voice medic, optional `GEMINI_MODEL` (default `gemini-2.5-flash`)
+   - `DEVICE_KEY`, any long random text, the password sensors use to upload
+4. Redeploy. The header shows "Ship database: Synced" when everything is connected.
+
+All keys stay on the server. The browser never sees them.
 
 On a real mission the speech model would run on the spacecraft, since there is no internet link to Mars.
 
