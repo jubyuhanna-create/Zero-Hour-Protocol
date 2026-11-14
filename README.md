@@ -20,7 +20,7 @@ On the way to Mars an answer from Earth takes about 23 minutes. Zero Hour Protoc
 ## Architecture
 
 ```
- Sensors (ESP32 + MAX30102, wearables)          Crew tablets and laptops (index.html)
+ Wearable sensors                                Crew tablets and laptops (index.html)
         |  POST /api/telemetry + device key              |   check-ins, voice, events, polling
         v                                                v
  +--------------------------------- Vercel serverless API ---------------------------------+
@@ -58,10 +58,6 @@ curl -X POST https://YOUR-APP.vercel.app/api/telemetry \
   -H "Content-Type: application/json" -H "x-device-key: YOUR_DEVICE_KEY" \
   -d '{"crew_id":"PLT","hr":72,"spo2":98,"activity":"rest"}'
 ```
-
-## Real sensor
-
-`esp32/pulse_uplink/pulse_uplink.ino` reads heart rate from a MAX30102 on an ESP32 and posts it every 5 seconds. The dashboard then shows that crew member as a live sensor.
 
 ## Run it
 

@@ -1,4 +1,4 @@
-// POST /api/telemetry  Sensors (an ESP32, a wearable gateway) send vitals here.
+// POST /api/telemetry  Wearable sensors send vitals here.
 //   Header:  x-device-key: <DEVICE_KEY>
 //   Body:    { "crew_id": "CDR", "hr": 72, "spo2": 98, "activity": "rest" }  or an array of those
 //   Each reading is triaged on the server and stored. Warning or critical readings also go to the event log.
