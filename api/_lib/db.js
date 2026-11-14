@@ -12,7 +12,8 @@ async function q(path, { method = 'GET', body, prefer } = {}) {
     method,
     headers: {
       apikey: KEY,
-      Authorization: `Bearer ${KEY}`,
+      // New sb_secret_ keys go in the apikey header only. Legacy service_role keys are JWTs and also go in Authorization.
+      ...(KEY.startsWith('eyJ') ? { Authorization: `Bearer ${KEY}` } : {}),
       'Content-Type': 'application/json',
       ...(prefer ? { Prefer: prefer } : {})
     },
