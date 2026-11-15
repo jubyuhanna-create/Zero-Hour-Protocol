@@ -79,7 +79,7 @@ Open `index.html` in a browser for the offline version: simulator, triage and a 
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from Supabase, Project Settings, API
    - `GEMINI_API_KEY` for the voice medic, optional `GEMINI_MODEL` (default `gemini-2.5-flash`)
    - `DEVICE_KEY`, any long random text, the password sensors use to upload
-   - optional `NASA_API_KEY` from api.nasa.gov for space weather (the public DEMO_KEY is used otherwise)
+   - no key is needed for space weather: DONKI is read from ccmc.gsfc.nasa.gov/DONKI-API, where NASA moved it on 30 September 2026. An optional `NASA_API_KEY` is only used for the old api.nasa.gov fallback
 4. Redeploy. The header shows "Ship database: Synced" when everything is connected.
 
 All keys stay on the server. The browser never sees them.
@@ -94,7 +94,7 @@ On a real mission the speech model would run on the spacecraft, since there is n
 - Zhang et al., Science Advances 2020: 1369 µSv per day on the Moon, 731 µSv per day on the ISS. Hassler et al., Science 2014: 0.64 mSv per day on the Mars surface.
 - Royal College of Physicians, NEWS2, 2017. Early warning score bands.
 - IEC 60601-1-8. Medical alarm colors.
-- NASA DONKI space weather database, Community Coordinated Modeling Center, through api.nasa.gov.
+- NASA DONKI space weather database, Community Coordinated Modeling Center, through the DONKI API at ccmc.gsfc.nasa.gov.
 - NASA Open Science Data Repository, OSD-575, LSDS-8 Comprehensive Metabolic Panel, Inspiration4 crew. Overbey et al., npj Microgravity 2024.
 - NASA Human Research Program, five hazards of human spaceflight and SANS.
 

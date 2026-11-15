@@ -499,7 +499,7 @@ footer{padding:10px 18px 22px;font-size:12px;color:var(--tx2)}
     <li>First aid steps and videos<span>St John Ambulance first aid advice and its official YouTube training videos, embedded, not copied. Steps rewritten in plain words.</span></li>
     <li>CPR in weightlessness: Evetts Russomano method first, handstand method on the medical restraint<span>Hinkelbein et al., guideline for CPR in microgravity, Scandinavian Journal of Trauma, Resuscitation and Emergency Medicine, 2020.</span></li>
     <li>Eye injuries from floating particles among the most common in flight, and celestial dust risks<span>NASA Lifetime Surveillance of Astronaut Health data reviewed in npj Microgravity, 2023.</span></li>
-    <li>Live solar flares and solar particle events<span>NASA Space Weather Database Of Notifications, Knowledge, Information (DONKI), Community Coordinated Modeling Center, through api.nasa.gov.</span></li>
+    <li>Live solar flares and solar particle events<span>NASA Space Weather Database Of Notifications, Knowledge, Information (DONKI), Community Coordinated Modeling Center, through its DONKI API at ccmc.gsfc.nasa.gov.</span></li>
     <li>Real blood test results of the Inspiration4 crew<span>NASA Open Science Data Repository, OSD-575, file LSDS-8 Comprehensive Metabolic Panel. Overbey et al., npj Microgravity 2024, and the Space Omics and Medical Atlas, Nature 2024.</span></li>
   </ol>
   <div class="mrow"><button id="srcClose">Close</button></div>
@@ -1559,9 +1559,10 @@ let SW=null;
 const FCLS=c=>({X:4,M:3,C:2,B:1,A:0}[(c||'A')[0]]||0)*100+parseFloat((c||'A0').slice(1)||0);
 async function loadSpaceWeather(){
   let d=await apiGet('/api/spaceweather');
-  if(!d){ // straight to NASA with the public demo key when there is no server
-    try{const day=x=>x.toISOString().slice(0,10),q=`startDate=${day(new Date(Date.now()-7*864e5))}&endDate=${day(new Date())}&api_key=DEMO_KEY`;
-      const g=async p=>{const r=await fetch(`https://api.nasa.gov/DONKI/${p}?${q}`);if(!r.ok)throw 0;const t=await r.text();return t?JSON.parse(t):[]};
+  if(!d){ // straight to NASA when there is no server: the DONKI API moved to ccmc.gsfc.nasa.gov on 30 September 2026, the old address is the fallback
+    try{const day=x=>x.toISOString().slice(0,10),q=`startDate=${day(new Date(Date.now()-7*864e5))}&endDate=${day(new Date())}`;
+      const one=async u=>{const r=await fetch(u);if(!r.ok)throw 0;const t=(await r.text()).trim();if(t&&t[0]!=='['&&t[0]!=='{')throw 0;return t?JSON.parse(t):[]};
+      const g=async p=>{try{return await one(`https://ccmc.gsfc.nasa.gov/DONKI-API/get/${p}?${q}`)}catch(_){return one(`https://api.nasa.gov/DONKI/${p}?${q}&api_key=DEMO_KEY`)}};
       const[f,sp]=await Promise.all([g('FLR'),g('SEP')]);d=summarizeDonki(f,sp)}catch(_){d=null}}
   SW=d;renderSW();
   if(d&&d.alert)log(-1,d.alert.level,`NASA DONKI: ${d.alert.text}. ${d.alert.level>=2?'Prepare the storm shelter and postpone spacewalks.':'Watch for particles over the next hours.'}`,false);
