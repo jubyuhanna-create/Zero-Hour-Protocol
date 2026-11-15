@@ -241,6 +241,13 @@ footer{padding:10px 18px 22px;font-size:12px;color:var(--tx2)}
 .fa{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
 @media(max-width:900px){.fa{grid-template-columns:1fr}}
 .fa-vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:3px;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--tx2);font-size:13px;padding:12px}
+.fa-ext{display:flex;flex-direction:column;align-items:center;gap:6px}
+.fa-ext b{color:var(--tx);font-weight:600;font-size:15px}
+.fa-ext span{font-size:13px}
+.fa-btn{margin-top:6px;display:inline-block;font:500 13px Barlow,sans-serif;color:var(--tx);background:var(--key);border:1px solid #1b1e21;border-bottom-width:3px;border-radius:3px;padding:7px 14px;text-decoration:none}
+.fa-btn:hover{background:#47505a}
+.fa-btn:focus-visible{outline:2px solid var(--sp);outline-offset:2px}
+.fa-vid{background:#000}
 .fa-vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .fa-src{font-size:12px;color:var(--tx2);margin-top:6px}
 .fa-src a{color:var(--sp)}
@@ -1316,11 +1323,11 @@ const FA=[
   steps:['Check for a response and for normal breathing for no more than 10 seconds.','Shout for the crew and send someone for the defibrillator.','Push hard and fast in the centre of the chest, 100 to 120 times a minute, about 5 to 6 cm deep.','Attach the defibrillator as soon as it arrives and follow its voice prompts.','Keep going, swapping rescuers every 2 minutes, until the person breathes normally.'],
   space:'Without gravity your body weight cannot push on the chest. Right away, use the Evetts Russomano method: wrap your legs around the patient and push with your arms. Once the patient is strapped to the medical restraint, switch to the handstand method with your feet braced on the wall.',
   help:'Cardiac arrest: start CPR immediately, then call the flight surgeon.'},
- {k:'choke',t:'Choking',yt:null,src:'St John Ambulance, Choking',page:'https://www.sja.org.uk/first-aid-advice/choking/',
+ {k:'choke',t:'Choking',yt:null,src:'St John Ambulance, Choking',page:'https://www.sja.org.uk/first-aid-advice/choking/',vid:{url:'https://www.redcross.org.uk/first-aid/learn-first-aid/choking',by:'British Red Cross',at:'0:55'},
   steps:['Ask: are you choking? If they can cough, tell them to keep coughing.','If they cannot cough or breathe, give up to 5 sharp back blows between the shoulder blades.','Check the mouth and remove anything you can see.','If it is still blocked, give up to 5 abdominal thrusts, pulling in and up above the belly button.','Repeat back blows and thrusts. If they become unresponsive, start CPR.'],
   space:'Brace yourself against a wall or foot restraint before each blow or thrust, otherwise the push just moves you both. Floating crumbs and liquid drops are the usual cause in space.',
   help:'Anyone who needed abdominal thrusts should be checked afterwards, so tell the flight surgeon.'},
- {k:'burn',t:'Burn',yt:null,src:'St John Ambulance, Burns and scalds',page:'https://www.sja.org.uk/first-aid-advice/burns-and-scalds/',
+ {k:'burn',t:'Burn',yt:null,src:'St John Ambulance, Burns and scalds',page:'https://www.sja.org.uk/first-aid-advice/burns-and-scalds/',vid:{url:'https://www.redcross.org.uk/first-aid/learn-first-aid/burns',by:'British Red Cross',at:'1:15'},
   steps:['Move the person away from the heat source.','Cool the burn with cold water for at least 20 minutes.','Take off rings, watches and clothing near the burn, unless stuck to it.','Cover it loosely with cling film or a clean non fluffy dressing. Do not burst blisters.','Watch for shock and keep the person warm.'],
   space:'Water does not flow in weightlessness, so soak cloths or use cold packs and keep re-wetting them, with a towel to catch loose drops. For a chemical splash in the eye, rinse at once and keep rinsing. It is one of the conditions that most often drives an evacuation from the station.',
   help:'Burns larger than the person\'s hand, on the face, hands or joints, or any chemical burn: call the flight surgeon.'},
@@ -1336,8 +1343,10 @@ function renderFA(){
   const f=FA.find(x=>x.k===faKey);
   const vid=f.yt&&navigator.onLine
     ?`<iframe src="https://www.youtube-nocookie.com/embed/${f.yt}?rel=0" title="${f.src}" loading="lazy" allow="encrypted-media; picture-in-picture" allowfullscreen></iframe>`
-    :`<div>${f.yt?'The video needs a link to Earth. The steps on the right work offline.':'Watch the official video guide on the St John Ambulance page below.'}</div>`;
-  $('#faBody').innerHTML=`<div><div class="fa-vid">${vid}</div><p class="fa-src">${f.yt?'Video':'Guide'}: ${f.src}.${f.page?` <a href="${f.page}" target="_blank" rel="noopener">Open the official page</a>`:''}${f.yt?`${f.page?' or':''} <a href="https://www.youtube.com/watch?v=${f.yt}" target="_blank" rel="noopener">${f.page?'watch':'Watch'} on YouTube</a>`:''}.</p></div>
+    :f.vid&&navigator.onLine
+    ?`<div class="fa-ext"><svg width="44" height="44" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="none" stroke="#9aa1a8" stroke-width="1.5"/><path d="M10 8l6 4-6 4z" fill="#e8e6e1"/></svg><b>Training video by the ${f.vid.by}</b><span>Opens on their site. The key steps start at ${f.vid.at}.</span><a class="fa-btn" href="${f.vid.url}" target="_blank" rel="noopener">Watch the video</a></div>`
+    :`<div>The video needs a link to Earth. The steps on the right work offline.</div>`;
+  $('#faBody').innerHTML=`<div><div class="fa-vid">${vid}</div><p class="fa-src">${f.yt?'Video':'Steps based on'}: ${f.src}.${f.page?` <a href="${f.page}" target="_blank" rel="noopener">Open the official page</a>`:''}${f.yt?`${f.page?' or':''} <a href="https://www.youtube.com/watch?v=${f.yt}" target="_blank" rel="noopener">${f.page?'watch':'Watch'} on YouTube</a>`:''}.</p></div>
    <div><h3>${f.t}</h3><ol>${f.steps.map(x=>`<li>${x}</li>`).join('')}</ol>
    <div class="fa-space"><b>In space</b>${f.space}</div>
    <p class="fa-help"><b>Get help:</b> ${f.help}${near()?' The ground can join in seconds here.':' An answer from Earth takes '+fmtRT(world.delay)+', so start the steps first.'}</p></div>`;
