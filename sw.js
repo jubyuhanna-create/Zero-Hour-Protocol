@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // Service worker: keeps the app usable with no network, like a ship with no link to Earth.
 // The app shell and fonts are cached. Live data from /api is never cached; the page queues
 // writes while offline and sends them when the link comes back.

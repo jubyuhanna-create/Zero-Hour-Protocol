@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // Vercel serverless function: turns speech or text into structured symptoms with Gemini.
 // The API key stays on the server (Vercel env var GEMINI_API_KEY). It never reaches the browser.
 // The model only listens and extracts. All medical decisions are made by the triage rules in index.html.

@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // Small helpers shared by the API routes.
 
 const CREW = ['CDR', 'PLT', 'FE', 'MO'];

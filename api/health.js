@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // GET /api/health: tells the app which backend features are switched on.
 const db = require('./_lib/db');
 const { route } = require('./_lib/http');

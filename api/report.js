@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // GET /api/report  Downlink report built on the server from the database:
 // newest sensor reading, check-ins and events of the last 24 hours, for each crew member.
 // ?format=json returns the same data as JSON.

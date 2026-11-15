@@ -1,3 +1,4 @@
+-- Use of AI: written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 -- Zero Hour Protocol database schema.
 -- Run once in Supabase: SQL Editor > New query > paste > Run.
 -- Row level security is on with no public policies, so only the server

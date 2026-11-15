@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // POST /api/telemetry  Wearable sensors send vitals here.
 //   Header:  x-device-key: <DEVICE_KEY>
 //   Body:    { "crew_id": "CDR", "hr": 72, "spo2": 98, "activity": "rest" }  or an array of those

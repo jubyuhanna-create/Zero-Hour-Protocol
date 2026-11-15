@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // POST /api/checkin  Save a daily check-in (from the form or from the voice medic).
 // GET  /api/checkin                newest check-in per crew member from the last 24 hours
 // GET  /api/checkin?crew=CDR&days=14   history for one crew member

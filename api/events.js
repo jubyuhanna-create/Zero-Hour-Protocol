@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // Shared mission event log, so every device on the ship sees the same history.
 // GET  /api/events            last 100 events, oldest first
 // GET  /api/events?after=123  only events newer than id 123 (used for polling)

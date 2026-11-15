@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // Minimal Supabase client over the PostgREST HTTP API. No npm dependencies.
 // Uses the service role key, so it must only ever run on the server.
 

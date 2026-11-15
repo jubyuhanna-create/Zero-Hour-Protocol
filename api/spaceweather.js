@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // GET /api/spaceweather  Live solar flares and solar particle events from NASA DONKI (last 7 days).
 // Uses NASA_API_KEY if set, otherwise NASA's public DEMO_KEY. Results are cached for 15 minutes
 // on the server and on Vercel's edge, so the demo key's hourly limit is never reached.

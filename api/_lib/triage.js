@@ -1,3 +1,4 @@
+// Use of AI: much of this code was written with Claude by Anthropic, guided and tested by the Zero Hour Protocol team.
 // Server side triage for one set of vitals. Same rules as the browser:
 // NEWS2 bands applied to vitals corrected for the current activity.
 
