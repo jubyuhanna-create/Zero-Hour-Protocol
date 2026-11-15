@@ -1470,10 +1470,11 @@ function forecast(arr,r,base,n,line=r.line){
   const y=arr.slice(-n),f=lineFit(y),d=r.dir;
   if(Math.sign(f.b)!==d)return null;
   if(d<0?f.cur<=line:f.cur>=line)return null;                  // already past the line: the triage alarm covers it
-  if(f.t<4||f.r2<.6||Math.abs(f.b*(n-1))<r.min)return null;          // not a strong, steady trend
+  const long=n>=30;
+  if(f.t<4||f.r2<(long?.5:.6)||Math.abs(f.b*(n-1))<r.min)return null;          // not a strong, steady trend
   if((base-f.cur)*-d<r.dev)return null;                              // still close to this person's normal
   const h=n>>1,f1=lineFit(y.slice(0,h)),f2=lineFit(y.slice(h));
-  if(Math.sign(f2.b)!==d||Math.abs(f2.b)<.6*Math.abs(f1.b))return null;   // levelling off, not heading for the line
+  if(Math.sign(f2.b)!==d||Math.abs(f2.b)<(long?.3:.6)*Math.abs(f1.b))return null;   // levelling off, not heading for the line
   if(Math.abs(line-f.cur)>(r.cap||2)*Math.abs(f.b*(n-1)))return null;   // too far to extrapolate safely
   const slope=Math.abs(f2.b)>Math.abs(f.b)?f2.b:f.b;                 // if it is speeding up, use the faster recent slope
   const mins=(line-f.cur)/slope*SIM_DT/60;
