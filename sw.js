@@ -2,7 +2,7 @@
 // Service worker: keeps the app usable with no network, like a ship with no link to Earth.
 // The app shell and fonts are cached. Live data from /api is never cached; the page queues
 // writes while offline and sends them when the link comes back.
-const VERSION = 'zhp-v1';
+const VERSION = 'zhp-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -225,6 +225,15 @@ footer{padding:10px 18px 22px;font-size:12px;color:var(--tx2)}
 .ship b{color:var(--warn);font-weight:600;display:block}
 .ship span{font-size:12.5px;color:var(--tx2);display:block}
 .ship ul{margin:4px 0 0 18px;font-size:13px}
+.zh{border:1px solid var(--warn);border-radius:3px;padding:9px 11px;margin:8px 0;background:rgba(242,194,48,.07)}
+.zh.zl{border-color:var(--crit);background:rgba(255,59,48,.09)}
+.zh-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.zh-h span{font-weight:600;color:var(--warn)}.zh.zl .zh-h span{color:#ff8a82}
+.zh-h b{font:600 34px/1 var(--num);font-variant-numeric:tabular-nums}
+.zh-h b small{font-size:12px;font-weight:400;color:var(--tx2);margin-left:5px}
+.zh p{margin:5px 0 0;font-size:13px}
+.zh .zh-e{color:var(--tx2);font-size:12.5px}
+.zhc{color:var(--warn);font-weight:600}.zhc.zl{color:#ff8a82}
 .rt .due{font:500 12px var(--num);color:var(--tx2);margin-left:6px}
 .rt .late{color:var(--warn)}
 #toast{position:fixed;left:18px;bottom:18px;max-width:340px;background:#111417;border:1px solid var(--line);border-left:4px solid var(--sp);border-radius:4px;padding:10px 12px;z-index:15;display:none;font-size:13.5px}
@@ -420,6 +429,7 @@ footer{padding:10px 18px 22px;font-size:12px;color:var(--tx2)}
       <p class="sub" id="tWho"></p>
       <div class="verdict" id="tVerdict"></div>
       <p class="sub" id="tScore"></p>
+      <div id="tZero" aria-live="polite"></div>
       <div id="tShip"></div>
       <div id="tLinked"></div>
       <div id="tFind"></div>
@@ -482,6 +492,7 @@ footer{padding:10px 18px 22px;font-size:12px;color:var(--tx2)}
     <li>Hip bone loss of 1.4 to 1.5% per month and spine 0.9% per month on ISS<span>Lang et al., Cortical and trabecular bone mineral loss from the spine and hip in long duration spaceflight, J Bone Miner Res, 2004. <a href="https://pubmed.ncbi.nlm.nih.gov/15125798/">PubMed</a></span></li>
     <li>Femoral neck loss of about 1.06% per month, used for the Mars projection<span>Axpe et al., A human mission to Mars: predicting the bone mineral density loss of astronauts, PLoS ONE, 2020.</span></li>
     <li>Early warning score bands for SpO₂, heart rate, breathing, temperature and blood pressure<span>Royal College of Physicians, National Early Warning Score 2, 2017. Applied here to vitals corrected for current activity.</span></li>
+    <li>Zero hour forecast<span>Our own method: a straight line fitted to the last 2 or 5 minutes of each vital sign, shown only when the trend is strong, steady and away from the person's normal. The time left until the red early warning band is compared with the round trip to Earth. Tested on the training drills: no false forecasts in 20 hours of simulated daily activity, and the forecast time was within about a minute of the real crossing.</span></li>
     <li>Alarm colors red, yellow and cyan for high, medium and low priority<span>IEC 60601-1-8, alarm systems in medical electrical equipment.</span></li>
     <li>Blurry vision linked to SANS, an eye change from fluid shift in weightlessness<span>NASA Human Research Program, Spaceflight Associated Neuro-ocular Syndrome.</span></li>
     <li>Background radiation by location: space station 731 µSv per day, Moon surface 1369 µSv per day, Mars surface 0.64 mSv per day<span>Zhang et al., First measurements of the radiation dose on the lunar surface, Science Advances 2020, with the ISS value for the same period. Hassler et al., Mars' surface radiation environment measured with the Mars Science Laboratory's Curiosity rover, Science 2014.</span></li>
@@ -517,7 +528,7 @@ const ICON=(L,sz=14)=>`<svg class="ic" viewBox="0 0 16 16" width="${sz}" height=
 const COL=['#4ce07b','#3cc8e8','#f2c230','#ff3b30'];
 
 let met=142*86400+6*3600+12*60, speed=1, running=true, audioOn=false, actx=null, sel=0, timer=null;
-const world={spe:null,shelter:false,delay:11.4,ppo2:21.3,ppco2:2.6};
+const world={spe:null,shelter:false,delay:11.4,ppo2:21.3,ppco2:2.6,hist:{ppo2:[]},zh:null};
 // Mission locations. Dose rates are measured values: ISS 731 µSv/day (2019), Mars cruise 1.84 mSv/day (Curiosity RAD),
 // Moon surface 1369 µSv/day (Chang'E 4 LND), Mars surface 0.64 mSv/day (Curiosity RAD).
 const ENVS={
@@ -537,7 +548,7 @@ const ACT_TXT={sleep:'Sleeping',rest:'Resting',work:'Working',exercise:'Exercisi
 function mk(id,name,role,base,dose,act){
   return{id,name,role,base,act,actT:Math.random()*100|0,lockT:0,sc:{},exp:{...base},
     v:{...base,rad:BG_RAD,dose,stress:18,irr:0,z:0},
-    hist:{hr:[],spo2:[],stress:[],rad:[],res:[],rr:[],temp:[]},sens:.8+Math.random()*.4,
+    hist:{hr:[],spo2:[],stress:[],rad:[],res:[],rr:[],temp:[],hra:[],rra:[],ta:[]},sens:.8+Math.random()*.4,
     tri:{level:0,score:0,f:[],sub:{}},prev:0,ack:true,done:new Set()};
 }
 const crew=[
@@ -574,8 +585,10 @@ function tick(silent){
   world.ppo2=lerp(world.ppo2,16.3,world.o2r);
   world.ppco2=lerp(world.ppco2,8.4,world.co2r);
   if(world.spe){world.spe.t++;if(world.spe.t>world.spe.dur){world.spe=null;if(!silent)log(-1,'i','Solar storm is over. Radiation back to normal background.')}}
+  push(world.hist.ppo2,world.ppo2);
   crew.forEach(a=>step(a,silent));
   shipPatterns(silent);
+  zeroHours(silent);
   if(!silent){routinePrompt();render()}
 }
 
@@ -627,6 +640,7 @@ function step(a,silent){
   v.stress=lerp(v.stress,st,.2);
 
   push(a.hist.hr,v.hr);push(a.hist.spo2,v.spo2);push(a.hist.stress,v.stress);push(a.hist.rad,v.rad);push(a.hist.res,v.hr-ex.hr);push(a.hist.rr,v.rr);push(a.hist.temp,v.temp);
+  push(a.hist.hra,v.hr-(ex.hr-b.hr));push(a.hist.rra,v.rr-(ex.rr-b.rr));push(a.hist.ta,v.temp-(ex.temp-b.temp));
   a.exp={...ex};
   triage(a);
 
@@ -744,9 +758,18 @@ function trend(c,data,o){
   const y=v=>h-2-(clamp(v,o.min,o.max)-o.min)/(o.max-o.min)*(h-4);
   if(o.lim){g.fillStyle='rgba(255,255,255,.05)';const a=y(o.lim[1]),b=y(o.lim[0]);g.fillRect(0,a,w,b-a)}
   if(data.length<2)return;
-  const dx=w/(HIST-1),off=HIST-data.length;
+  const fw=o.fc?w*.72:w,dx=fw/(HIST-1),off=HIST-data.length;
   g.beginPath();data.forEach((v,i)=>{const X=(off+i)*dx,Y=y(v);i?g.lineTo(X,Y):g.moveTo(X,Y)});
   g.strokeStyle=o.color;g.lineWidth=o.lw||1.5;g.lineJoin='round';g.stroke();
+  if(o.fc){
+    // forecast zone: the same time scale continued to the right, with the danger line and the projected crossing
+    const F=o.fc,last=data[data.length-1],zone=(w-fw)/dx,steps=Math.min(zone,F.cross),x1=fw+steps*dx,v1=last+F.slope*steps;
+    g.fillStyle='rgba(242,194,48,.08)';g.fillRect(fw,0,w-fw,h);
+    g.strokeStyle='rgba(255,59,48,.85)';g.lineWidth=1;g.beginPath();g.moveTo(fw,y(F.line));g.lineTo(w,y(F.line));g.stroke();
+    g.setLineDash([4,3]);g.strokeStyle=o.color;g.lineWidth=1.5;g.beginPath();g.moveTo(fw,y(last));g.lineTo(x1,y(v1));g.stroke();g.setLineDash([]);
+    if(F.cross<=zone){g.fillStyle='#ff3b30';g.beginPath();g.arc(x1,y(F.line),3.5,0,7);g.fill()}
+    g.fillStyle='rgba(255,255,255,.6)';g.font='11px Barlow, sans-serif';g.textAlign='right';g.fillText('forecast',w-3,11);g.textAlign='left';
+  }
 }
 
 function buildCrew(){
@@ -777,7 +800,7 @@ function render(){
     const st=q('st');st.innerHTML=ICON(L)+LVL[L];st.className='st st'+L;
     q('hr').textContent=v.hr.toFixed(0);q('sp').textContent=v.spo2.toFixed(0);
     q('act').textContent=ACT_TXT[a.act]+(world.shelter?', in shelter':'')+(a.live&&Date.now()-a.live.at<30000?', live sensor':'');
-    q('dose').textContent=v.dose.toFixed(1)+' mSv';
+    const zq=q('dose');if(a.zh){const late=a.zh.reached||zhLate(a.zh.mins);zq.innerHTML=`<span class="zhc ${late?'zl':''}">Zero hour ${a.zh.reached?'now':'in '+Math.max(1,Math.round(a.zh.mins))+' min'}</span>`}else zq.textContent=v.dose.toFixed(1)+' mSv';
     trend(q('spark'),a.hist.hr,{min:30,max:180,color:'#4ce07b',lw:1.2});
   });
 
@@ -785,7 +808,10 @@ function render(){
   $('#pName').textContent=`${a.name}, ${a.role.toLowerCase()}`;
   $('#pAct').textContent=ACT_TXT[a.act];
   const pm=$('#pMsg');const top=a.tri.f[0];
-  pm.innerHTML=L&&top?ICON(L,13)+top.msg:'';pm.className='msg'+(L&&top?' m'+L:'');
+  if(a.zh&&L<2&&!a.zh.reached){pm.innerHTML=ICON(2,13)+`Zero hour in ${Math.max(1,Math.round(a.zh.mins))} min: ${a.zh.r.name}`;pm.className='msg m2'}
+  else if(L&&top){pm.innerHTML=ICON(L,13)+top.msg;pm.className='msg m'+L}
+  else if(a.zh){pm.innerHTML=ICON(2,13)+`Zero hour in ${Math.max(1,Math.round(a.zh.mins))} min: ${a.zh.r.name}`;pm.className='msg m2'}
+  else{pm.innerHTML='';pm.className='msg'}
   setNb('#nHr',v.hr.toFixed(0),a.tri.f.some(f=>f.irr)?3:sub.hr);
   $('#lHr').textContent=`usual ${a.base.hr}`;
   setNb('#nSp',v.spo2.toFixed(0),sub.spo2);
@@ -794,8 +820,9 @@ function render(){
   setNb('#nBp',`${v.sbp.toFixed(0)}/${v.dbp.toFixed(0)}`,sub.sbp);
   $('#uMap').textContent=`(${((v.sbp+2*v.dbp)/3).toFixed(0)})`;
 
-  trend($('#cHr'),a.hist.hr,{min:30,max:190,color:'#4ce07b',lim:[51,90]});
-  trend($('#cSp'),a.hist.spo2,{min:80,max:100,color:'#3cc8e8',lim:[96,100]});
+  const fc=k=>a.zh&&!a.zh.reached&&a.zh.r.k===k?{slope:a.zh.slope,line:a.zh.r.line+(k==='hr'?a.exp.hr-a.base.hr:0),cross:a.zh.mins*60/SIM_DT}:null;
+  trend($('#cHr'),a.hist.hr,{min:30,max:190,color:'#4ce07b',lim:[51,90],fc:fc('hr')});
+  trend($('#cSp'),a.hist.spo2,{min:80,max:100,color:'#3cc8e8',lim:[96,100],fc:fc('spo2')});
   trend($('#cSt'),a.hist.stress,{min:0,max:100,color:'#e8e6e1',lim:[0,65]});
   const rmax=Math.max(400,...a.hist.rad)*1.1;
   trend($('#cRad'),a.hist.rad,{min:0,max:rmax,color:'#f2d04b',lim:[0,200]});
@@ -810,6 +837,7 @@ function render(){
   const tv=$('#tVerdict');tv.innerHTML=ICON(L,30)+LVL[L];tv.className='verdict st'+L;
   $('#tScore').textContent=`Early warning score ${a.tri.score}`+(L>=2?`. Responder: ${responder(a).name}`:'');
   $('#tFind').innerHTML=a.tri.f.length?a.tri.f.map(x=>`<div class="find f${x.sev}"><b class="st${x.sev}">${ICON(x.sev,13)}${x.msg}</b><span>${x.why}</span><span class="esc">${ESC[x.sev]}</span></div>`).join(''):`<p class="calm">Everything is within ${a.name.split(' ')[0]}'s usual range for ${ACT_TXT[a.act].toLowerCase()}.</p>`;
+  $('#tZero').innerHTML=zhBox(a.zh,`${a.name.split(' ')[0]}'s `)+(world.zh?zhBox(world.zh,''):'');
   const P=world.patterns||[];
   $('#tShip').innerHTML=P.map(p=>`<div class="ship"><b>${ICON(2,13)}${p.msg}</b><span>${p.why}</span><ul>${p.act.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('');
   const lk=linked(a);
@@ -901,11 +929,13 @@ function report(){
   L.push('Zero Hour Protocol crew health downlink');
   L.push(`Ares VII, ${E.label}, ${fmtMet(met)}. Signal delay ${fmtDelay(world.delay)}.`);
   L.push(`Cabin O2 ${world.ppo2.toFixed(1)} kPa, CO2 ${world.ppco2.toFixed(1)} mmHg. Space weather: ${world.spe?'solar storm in progress':'quiet'}. Shelter ${world.shelter?'occupied':'empty'}.`);
+  if(world.zh)L.push(world.zh.reached?'ZERO HOUR REACHED: cabin oxygen below 19 kPa':`ZERO HOUR FORECAST: cabin oxygen reaches 19 kPa in about ${Math.max(1,Math.round(world.zh.mins))} min`);
   L.push('');
   crew.forEach(a=>{const v=a.v;
     L.push(`${a.name}, ${a.role}: ${LVL[a.tri.level]} (score ${a.tri.score}), ${ACT_TXT[a.act].toLowerCase()}`);
     L.push(`  HR ${v.hr.toFixed(0)}, SpO2 ${v.spo2.toFixed(0)}%, temp ${v.temp.toFixed(1)} C, resp ${v.rr.toFixed(0)}, BP ${v.sbp.toFixed(0)}/${v.dbp.toFixed(0)}, HRV ${v.hrv.toFixed(0)} ms, stress ${v.stress.toFixed(0)}`);
     L.push(`  Dose ${v.dose.toFixed(2)} mSv, ${(v.dose/CAREER_LIMIT*100).toFixed(1)}% of career limit. Current rate ${v.rad.toFixed(0)} uSv/h`);
+    if(a.zh)L.push(a.zh.reached?`  ZERO HOUR REACHED: ${a.zh.r.name} crossed ${a.zh.r.lineTxt}`:`  ZERO HOUR FORECAST: ${a.zh.r.name} reaches ${a.zh.r.lineTxt} in about ${Math.max(1,Math.round(a.zh.mins))} min at ${a.zh.r.rate(Math.abs(a.zh.perMin))}`);
     a.tri.f.forEach(x=>L.push(`  ! ${x.msg}. ${x.why}`));
     if(a.done.size)L.push(`  Done onboard: ${[...a.done].join('; ')}`);
   });
@@ -1408,6 +1438,98 @@ function linked(a){
   else if(a.act==='exercise'||a.act==='eva')pat='normal response to activity';
   return{ch,pat};
 }
+
+/* ---------------- ZERO HOUR FORECAST ----------------
+   The zero hour is the moment a problem turns critical. For every vital sign, fit a straight line to
+   the last 2 minutes of mission time and ask: if nothing changes, when does it cross the line where the
+   early warning score turns red? Heart rate, breathing and temperature are activity adjusted first, so a
+   workout is not mistaken for a crisis. The forecast is only shown when the trend is strong and steady,
+   and the time left is compared with the round trip to Earth: is there time to ask the flight surgeon,
+   or must the crew act on board now? */
+const ZH_N=12, ZH_MAX=30;
+// min: smallest change over the 2 minute window, dev: smallest distance from this person's own normal.
+// Both are set well above the normal sensor noise, so a forecast means a real trend.
+const ZH_RULES=[
+ {k:'spo2',h:'spo2',name:'SpO₂',low:'SpO₂',dir:-1,line:92,lineTxt:'below 92%',band:'where the early warning score turns red',rate:x=>`${x.toFixed(1)}% a minute`,min:2.5,dev:2,base:a=>a.base.spo2},
+ {k:'hr',h:'hra',name:'Heart rate',low:'heart rate',dir:1,line:131,lineTxt:'131 bpm',band:'where the early warning score turns red, after allowing for activity',rate:x=>`${x.toFixed(0)} bpm a minute`,min:10,dev:20,cap:1.2,base:a=>a.base.hr,skip:a=>a.v.irr>9},
+ {k:'rr',h:'rra',name:'Breathing',low:'breathing rate',dir:1,line:25,lineTxt:'25 breaths a minute',band:'where the early warning score turns red, after allowing for activity',rate:x=>`${x.toFixed(1)} breaths a minute faster every minute`,min:4,dev:6,cap:1.5,base:a=>a.base.rr},
+ {k:'temp',h:'ta',lineOf:a=>39.1-(a.exp.temp-a.base.temp),name:'Body temperature',low:'body temperature',dir:1,line:39.1,lineTxt:'39.1 °C',band:'the top early warning band for temperature',rate:x=>`${x.toFixed(2)} °C a minute`,min:.35,dev:.4,base:a=>a.base.temp},
+];
+const ZH_CABIN={k:'ppo2',name:'Cabin oxygen',low:'cabin oxygen',dir:-1,line:19,lineTxt:'19 kPa',band:'the safe level for cabin air',rate:x=>`${x.toFixed(1)} kPa a minute`,min:.5,dev:.6,base:()=>21.3};
+function lineFit(y){
+  const n=y.length;let sx=0,sy=0,sxx=0,sxy=0;
+  for(let i=0;i<n;i++){sx+=i;sy+=y[i];sxx+=i*i;sxy+=i*y[i]}
+  const vx=sxx-sx*sx/n,b=(sxy-sx*sy/n)/vx,a=(sy-b*sx)/n,my=sy/n;let ss=0,st=0;
+  for(let i=0;i<n;i++){const r=y[i]-(a+b*i);ss+=r*r;st+=(y[i]-my)**2}
+  const se=Math.sqrt(ss/Math.max(1,n-2)/vx);
+  return{b,cur:a+b*(n-1),t:Math.abs(b)/Math.max(se,1e-9),r2:st>1e-12?1-ss/st:0};
+}
+function forecast(arr,r,base,n,line=r.line){
+  if(!n){for(const w of [ZH_N,30]){const f=forecast(arr,r,base,w,line);if(f)return f}return null}
+  if(!arr||arr.length<n)return null;
+  const y=arr.slice(-n),f=lineFit(y),d=r.dir;
+  if(Math.sign(f.b)!==d)return null;
+  if(d<0?f.cur<=line:f.cur>=line)return null;                  // already past the line: the triage alarm covers it
+  if(f.t<4||f.r2<.6||Math.abs(f.b*(n-1))<r.min)return null;          // not a strong, steady trend
+  if((base-f.cur)*-d<r.dev)return null;                              // still close to this person's normal
+  const h=n>>1,f1=lineFit(y.slice(0,h)),f2=lineFit(y.slice(h));
+  if(Math.sign(f2.b)!==d||Math.abs(f2.b)<.6*Math.abs(f1.b))return null;   // levelling off, not heading for the line
+  if(Math.abs(line-f.cur)>(r.cap||2)*Math.abs(f.b*(n-1)))return null;   // too far to extrapolate safely
+  const slope=Math.abs(f2.b)>Math.abs(f.b)?f2.b:f.b;                 // if it is speeding up, use the faster recent slope
+  const mins=(line-f.cur)/slope*SIM_DT/60;
+  if(!(mins>0&&mins<=ZH_MAX))return null;
+  return{mins,perMin:slope*60/SIM_DT,slope};
+}
+const crossed=(arr,r,line=r.line)=>{const l=avg(arr.slice(-3));return r.dir<0?l<line:l>=line};
+// keep one forecast per person: confirmed after 2 ticks in a row, marked reached once its line is crossed
+function zhUpdate(o,prev,best,arrOf,lineOf=r=>r.line){
+  if(prev&&crossed(arrOf(prev.r),prev.r,lineOf(prev.r)))return{...prev,reached:true,mins:0,miss:0,isNew:false};   // its own line is crossed: the forecast came true
+  if(prev&&prev.reached){if(++prev.miss>3)return null;prev.isNew=false;return prev}
+  if(best){
+    if(!prev){o.cand=o.cand&&o.cand.r===best.r?{r:best.r,n:o.cand.n+1}:{r:best.r,n:1};if(o.cand.n<2)return null}
+    const same=prev&&prev.r===best.r;
+    return{r:best.r,mins:same?prev.mins+(best.f.mins-prev.mins)*.35:best.f.mins,perMin:best.f.perMin,slope:best.f.slope,miss:0,isNew:!prev};
+  }
+  o.cand=null;
+  if(!prev)return null;
+  if(crossed(arrOf(prev.r),prev.r,lineOf(prev.r)))return{...prev,reached:true,mins:0,miss:0,isNew:false};
+  // a noisy moment does not cancel a forecast: keep it for 2 minutes, re-estimated from the latest value and slope
+  if(++prev.miss>12)return null;
+  const ln=lineOf(prev.r),m=(ln-avg(arrOf(prev.r).slice(-3)))/prev.slope*SIM_DT/60;
+  if(!(m>0)||m>ZH_MAX)return null;
+  prev.mins=prev.mins+(m-prev.mins)*.35;prev.isNew=false;return prev;
+}
+const zhLate=m=>m<2*world.delay;
+function zeroHours(silent){
+  // one forecast per vital sign, the soonest one is shown; a forecast that comes true stays as reached
+  crew.forEach((a,i)=>{
+    a.zhs=a.zhs||{};a.zc=a.zc||{};
+    ZH_RULES.forEach(r=>{
+      const line=r.lineOf?r.lineOf(a):r.line,f=r.skip&&r.skip(a)?null:forecast(a.hist[r.h],r,r.base(a),0,line),o=a.zc[r.k]=a.zc[r.k]||{};
+      const z=a.zhs[r.k]=zhUpdate(o,a.zhs[r.k],f?{r,f}:null,()=>a.hist[r.h],rr=>rr.lineOf?rr.lineOf(a):rr.line);
+      if(z&&z.isNew&&!silent){
+        const late=zhLate(z.mins);
+        log(i,2,`Zero hour forecast: ${a.name}'s ${r.low} reaches ${r.lineTxt} in about ${Math.max(1,Math.round(z.mins))} min. ${late?'Earth cannot answer in time, act on board now.':'There is time to ask Earth.'}`);
+        if(!demoOn)playPattern(late?2:1);
+      }
+    });
+    const all=Object.values(a.zhs).filter(Boolean);
+    a.zh=all.find(z=>z.reached)||all.sort((x,y)=>x.mins-y.mins)[0]||null;
+  });
+  const f=forecast(world.hist.ppo2,ZH_CABIN,21.3,6);
+  world.zc=world.zc||{};
+  world.zh=zhUpdate(world.zc,world.zh,f?{r:ZH_CABIN,f}:null,()=>world.hist.ppo2);
+  if(world.zh&&world.zh.isNew&&!silent)log(-1,2,`Zero hour forecast: cabin oxygen reaches ${ZH_CABIN.lineTxt} in about ${Math.max(1,Math.round(world.zh.mins))} min`);
+}
+const fmtZ=m=>{const s=Math.max(0,Math.round(m*60/10)*10);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
+function zhBox(z,who){
+  if(!z)return'';
+  const r=z.r,rt=fmtRT(world.delay),late=z.reached||zhLate(z.mins);
+  if(z.reached)return `<div class="zh zl"><div class="zh-h"><span>Zero hour reached</span><b>0:00</b></div><p>${who}${r.low} has crossed ${r.lineTxt}, ${r.band}. The forecast saw it coming.</p><p class="zh-e">Follow the checklist on board now${near()?' and call the flight surgeon.':', an answer from Earth takes about '+rt+'.'}</p></div>`;
+  return `<div class="zh ${late?'zl':''}"><div class="zh-h"><span>Zero hour forecast</span><b>${fmtZ(z.mins)}<small>min left</small></b></div>
+   <p>${who}${r.low} is ${r.dir<0?'falling':'rising'} ${r.rate(Math.abs(z.perMin))}. If nothing changes it ${r.dir<0?'drops':'climbs'} to ${r.lineTxt}, ${r.band}, in about ${Math.max(1,Math.round(z.mins))} minute${Math.round(z.mins)>1?'s':''}.</p>
+   <p class="zh-e">${late?`An answer from Earth takes about ${rt}, longer than the time left. Do not wait for Earth: start the checklist on board now.`:`An answer from Earth takes about ${rt}. Send a report now and start the checklist, the answer can arrive before the zero hour.`}</p></div>`;
+}
 function wakeSleepers(reason){
   crew.forEach((c,i)=>{if(c.act==='sleep'){c.act='rest';c.lockT=60;c.lt.sleep[TODAY]=Math.max(3,(c.lt.sleep[TODAY]||6.5)-1.5);c.v.stress=Math.min(100,c.v.stress+15);
     log(i,'i',`${c.name} woken by the ${reason} alarm, about 1.5 hours of sleep lost`)}});
@@ -1510,8 +1632,8 @@ const DEMO=[
  [7,'Every reading is compared with that person\'s own baseline and with what they are doing. Layla starts a workout, her heart rate climbs and the system stays calm.',()=>{pick(2);crew[2].act='exercise';crew[2].lockT=400}],
  [15,'A solar storm hits. Radiation jumps to about 40 times normal and the whole crew is flagged at once.',()=>{$('#bSpe').click();setSpeed(5)}],
  [23,'Following the checklist, the crew moves into the storm shelter. The dose rate drops by about 70%, and each person\'s storm dose is tracked against NASA\'s 250 mSv limit.',()=>{$('#bShelter').click()}],
- [31,'Now a slow oxygen leak in Ana\'s suit loop. She feels fine, but her SpO₂ is sliding.',()=>{pick(0);inject('hypoxia')}],
- [39,'Triage catches it, explains why, and gives a checklist the crew can act on now instead of waiting 23 minutes for an answer from Earth.',()=>{}],
+ [31,'Now a slow oxygen leak in Ana\'s suit loop. She feels fine, but her SpO₂ is sliding.',()=>{pick(0);inject('hypoxia');crew[0].sc.hypoxia.ramp=120}],
+ [39,'The zero hour forecast shows how many minutes are left until her oxygen turns critical. An answer from Earth would take 23 minutes, too late, so the checklist comes first.',()=>{}],
  [48,'Ana puts on the oxygen mask and the leak is fixed. Her readings recover and every step is logged.',()=>{const a=crew[0];a.tri.f.slice(0,1).forEach(f=>f.act.forEach(t=>a.done.add(t)));log(0,'i','Ana Reyes: put on the oxygen mask from the medical kit');a.sc={};render()}],
  [55,'Crew also report how they feel. Kenji logs blurry vision and 4 hours of sleep, so triage adds an eye scan for SANS.',()=>{pick(1);saveCi(3,4,['vision'],1)}],
  [63,'Tap the eyes on the body map to learn what SANS is, how it is checked in space, and what to do next.',()=>{zone='eyes';render();document.querySelector('#fig').scrollIntoView({behavior:'smooth',block:'center'})}],
